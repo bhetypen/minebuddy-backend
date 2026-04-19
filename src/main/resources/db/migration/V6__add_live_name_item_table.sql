@@ -1,0 +1,1 @@
+ALTER TABLE items ADD COLUMN live_name VARCHAR(50);
