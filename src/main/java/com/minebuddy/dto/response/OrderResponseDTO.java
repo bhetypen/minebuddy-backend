@@ -13,6 +13,8 @@ public record OrderResponseDTO(
         int quantity,
         PaymentType paymentType,
         BigDecimal unitPriceAtOrderTime,
+        BigDecimal itemTotal,
+        BigDecimal shippingFee,
         BigDecimal totalAmount,
         BigDecimal dpRequired,
         BigDecimal dpPaid,

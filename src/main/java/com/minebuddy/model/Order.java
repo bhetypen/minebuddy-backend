@@ -34,6 +34,15 @@ public class Order {
     @Column(name = "unit_price_at_order_time", nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPriceAtOrderTime;
 
+    // Item subtotal: unitPrice × quantity. Does not include shipping.
+    @Column(name = "item_total", nullable = false, precision = 10, scale = 2)
+    private BigDecimal itemTotal;
+
+    // Shipping fee for this order. 0 means free shipping / absorbed in price.
+    @Column(name = "shipping_fee", nullable = false, precision = 10, scale = 2)
+    private BigDecimal shippingFee;
+
+    // Total charged to buyer: itemTotal + shippingFee
     @Column(name = "total_amount", nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
 
@@ -64,19 +73,28 @@ public class Order {
     protected Order() {}
 
     public Order(UUID customerId, UUID itemId, int quantity, PaymentType paymentType,
-                 BigDecimal unitPriceAtOrderTime, BigDecimal totalAmount, BigDecimal dpRequired) {
+                 BigDecimal unitPriceAtOrderTime, BigDecimal itemTotal,
+                 BigDecimal shippingFee, BigDecimal dpRequired) {
         this.orderId = UUID.randomUUID();
         this.customerId = customerId;
         this.itemId = itemId;
         this.quantity = quantity;
         this.paymentType = paymentType;
         this.unitPriceAtOrderTime = unitPriceAtOrderTime;
-        this.totalAmount = totalAmount;
+        this.itemTotal = itemTotal;
+        this.shippingFee = (shippingFee != null) ? shippingFee : BigDecimal.ZERO;
+        this.totalAmount = this.itemTotal.add(this.shippingFee);
         this.dpRequired = (dpRequired != null) ? dpRequired : BigDecimal.ZERO;
         this.dpPaid = BigDecimal.ZERO;
         this.finalPaid = BigDecimal.ZERO;
-        this.balance = totalAmount;
+        this.balance = this.totalAmount;
         this.status = OrderStatus.RESERVED;
+    }
+
+    /** Recompute totalAmount from itemTotal + shippingFee, then rebase balance. */
+    public void recalculateTotals() {
+        this.totalAmount = this.itemTotal.add(this.shippingFee);
+        recalculateBalance();
     }
 
     public void recalculateBalance() {
@@ -105,6 +123,8 @@ public class Order {
     public int getQuantity()                    { return quantity; }
     public PaymentType getPaymentType()         { return paymentType; }
     public BigDecimal getUnitPriceAtOrderTime() { return unitPriceAtOrderTime; }
+    public BigDecimal getItemTotal()            { return itemTotal; }
+    public BigDecimal getShippingFee()          { return shippingFee; }
     public BigDecimal getTotalAmount()          { return totalAmount; }
     public BigDecimal getDpRequired()           { return dpRequired; }
     public BigDecimal getDpPaid()               { return dpPaid; }
@@ -117,6 +137,8 @@ public class Order {
     public void setItemId(UUID itemId)                              { this.itemId = itemId; }
     public void setQuantity(int quantity)                           { this.quantity = quantity; }
     public void setUnitPriceAtOrderTime(BigDecimal p)               { this.unitPriceAtOrderTime = p; }
+    public void setItemTotal(BigDecimal itemTotal)                  { this.itemTotal = itemTotal; recalculateTotals(); }
+    public void setShippingFee(BigDecimal shippingFee)              { this.shippingFee = shippingFee; recalculateTotals(); }
     public void setTotalAmount(BigDecimal totalAmount)              { this.totalAmount = totalAmount; recalculateBalance(); }
     public void setDpRequired(BigDecimal dpRequired)                { this.dpRequired = dpRequired; }
     public void setDpPaid(BigDecimal dpPaid)                        { this.dpPaid = dpPaid; recalculateBalance(); }

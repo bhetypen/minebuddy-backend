@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -65,7 +66,12 @@ public class OrderController {
 
     @PatchMapping("/{id}")
     public ResponseEntity<?> edit(@PathVariable UUID id, @RequestBody EditOrderPayload payload) {
-        boolean ok = service.editOrder(id, payload.itemId(), payload.quantity());
+        boolean ok = service.editOrder(
+                id,
+                payload.itemId(),
+                payload.quantity(),
+                payload.shippingFee()
+        );
         if (!ok) {
             return ResponseEntity.badRequest().body(Map.of("message", service.getMessage()));
         }
@@ -99,6 +105,6 @@ public class OrderController {
         ));
     }
 
-    public record EditOrderPayload(UUID itemId, int quantity) {}
+    public record EditOrderPayload(UUID itemId, int quantity, BigDecimal shippingFee) {}
     public record StatusPayload(OrderStatus status) {}
 }

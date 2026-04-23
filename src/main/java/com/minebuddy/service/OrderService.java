@@ -129,7 +129,7 @@ public class OrderService {
         if (rank(nextStatus) >= rank(OrderStatus.PACKED) && nextStatus != OrderStatus.CANCELLED) {
             boolean needsArrival = item.getSaleType() == SaleType.PREORDER_ONLY
                     || (item.getSaleType() == SaleType.HYBRID
-                        && rank(order.getStatus()) >= rank(OrderStatus.ORDERED_FROM_SUPPLIER));
+                    && rank(order.getStatus()) >= rank(OrderStatus.ORDERED_FROM_SUPPLIER));
 
             if (needsArrival && order.getStatus() != OrderStatus.ARRIVED) {
                 this.message = "Logistics Error: Item has not arrived from the supplier yet.";
@@ -175,7 +175,7 @@ public class OrderService {
     }
 
     @Transactional
-    public boolean editOrder(UUID orderId, UUID newItemId, int newQty) {
+    public boolean editOrder(UUID orderId, UUID newItemId, int newQty, BigDecimal newShippingFee) {
         Order order = orderRepo.findById(orderId).orElse(null);
 
         if (order == null || rank(order.getStatus()) >= 4 || newQty <= 0) {
@@ -207,7 +207,10 @@ public class OrderService {
             itemRepo.save(newItem);
         }
 
-        BigDecimal newTotal = newItem.getPrice().multiply(BigDecimal.valueOf(newQty));
+        BigDecimal newItemTotal = newItem.getPrice().multiply(BigDecimal.valueOf(newQty));
+        BigDecimal finalShippingFee = (newShippingFee != null) ? newShippingFee : order.getShippingFee();
+        BigDecimal newTotal = newItemTotal.add(finalShippingFee);
+
         BigDecimal newDpReq = order.getPaymentType() == PaymentType.PREORDER
                 ? newTotal.multiply(DP_RATE).setScale(2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
@@ -215,16 +218,15 @@ public class OrderService {
         order.setItemId(newItemId);
         order.setQuantity(newQty);
         order.setUnitPriceAtOrderTime(newItem.getPrice());
-        order.setTotalAmount(newTotal);
+        order.setItemTotal(newItemTotal);
+        order.setShippingFee(finalShippingFee);
         order.setDpRequired(newDpReq);
-
-        BigDecimal totalPaid = order.getTotalPaid();
-        order.setBalance(newTotal.subtract(totalPaid));
+        // totalAmount and balance are recalculated automatically via setter cascades
 
         if (order.getStatus() == OrderStatus.DP_PAID && newDpReq.compareTo(order.getDpPaid()) > 0) {
             order.setStatus(OrderStatus.RESERVED);
         }
-        if (order.getStatus() == OrderStatus.FULLY_PAID && newTotal.compareTo(totalPaid) > 0) {
+        if (order.getStatus() == OrderStatus.FULLY_PAID && newTotal.compareTo(order.getTotalPaid()) > 0) {
             order.setStatus(OrderStatus.ARRIVED);
         }
 
@@ -345,8 +347,15 @@ public class OrderService {
             item.decreaseStock(stockQty);
             itemRepo.save(item);
 
-            Order stockOrder = buildOrder(request, item, stockQty, request.paymentType());
-            Order preOrder = buildOrder(request, item, preorderQty, PaymentType.PREORDER);
+            // Split shipping fee proportionally by quantity so neither half double-bills it
+            BigDecimal totalFee = request.shippingFee() != null ? request.shippingFee() : BigDecimal.ZERO;
+            BigDecimal stockFee = totalFee
+                    .multiply(BigDecimal.valueOf(stockQty))
+                    .divide(BigDecimal.valueOf(request.quantity()), 2, RoundingMode.HALF_UP);
+            BigDecimal preorderFee = totalFee.subtract(stockFee);
+
+            Order stockOrder = buildOrderWithFee(request, item, stockQty, request.paymentType(), stockFee);
+            Order preOrder = buildOrderWithFee(request, item, preorderQty, PaymentType.PREORDER, preorderFee);
 
             stockOrder = orderRepo.save(stockOrder);
             preOrder = orderRepo.save(preOrder);
@@ -364,8 +373,15 @@ public class OrderService {
     }
 
     private Order buildOrder(OrderRequestDTO request, Item item, int quantity, PaymentType paymentType) {
+        return buildOrderWithFee(request, item, quantity, paymentType, request.shippingFee());
+    }
+
+    private Order buildOrderWithFee(OrderRequestDTO request, Item item, int quantity,
+                                    PaymentType paymentType, BigDecimal shippingFee) {
         BigDecimal unitPrice = item.getPrice();
-        BigDecimal total = unitPrice.multiply(BigDecimal.valueOf(quantity));
+        BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
+        BigDecimal fee = (shippingFee != null) ? shippingFee : BigDecimal.ZERO;
+        BigDecimal total = itemTotal.add(fee);
 
         BigDecimal dpReq;
         if (paymentType == PaymentType.PREORDER) {
@@ -383,7 +399,8 @@ public class OrderService {
                 quantity,
                 paymentType,
                 unitPrice,
-                total,
+                itemTotal,
+                fee,
                 dpReq
         );
     }
@@ -407,7 +424,7 @@ public class OrderService {
         };
     }
 
-    private OrderResponseDTO toResponseDTO(Order o) {
+    public OrderResponseDTO toResponseDTO(Order o) {
         return new OrderResponseDTO(
                 o.getOrderId().toString(),
                 o.getCustomerId().toString(),
@@ -415,6 +432,8 @@ public class OrderService {
                 o.getQuantity(),
                 o.getPaymentType(),
                 o.getUnitPriceAtOrderTime(),
+                o.getItemTotal(),
+                o.getShippingFee(),
                 o.getTotalAmount(),
                 o.getDpRequired(),
                 o.getDpPaid(),

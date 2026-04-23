@@ -19,7 +19,12 @@ public record OrderRequestDTO(
         @NotNull(message = "Payment type is required")
         PaymentType paymentType,
 
-        @DecimalMin(value = "0.00", message = "Down payment required must be non-negative")
-        @Digits(integer = 8, fraction = 2)
-        BigDecimal dpRequired
+        @DecimalMin(value = "0.00", message = "DP required must be non-negative")
+        @Digits(integer = 8, fraction = 2, message = "DP required must have at most 2 decimal places")
+        BigDecimal dpRequired,
+
+        @NotNull(message = "Shipping fee is required (use 0 for free shipping)")
+        @DecimalMin(value = "0.00", message = "Shipping fee must be non-negative")
+        @Digits(integer = 8, fraction = 2, message = "Shipping fee must have at most 2 decimal places")
+        BigDecimal shippingFee
 ) {}
