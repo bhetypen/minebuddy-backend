@@ -1,8 +1,11 @@
 package com.minebuddy.model;
 
+import com.minebuddy.security.TenantContext;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -13,10 +16,16 @@ import java.util.UUID;
 public class Shipment {
 
     @Id
-    @Column(name = "shipment_id", columnDefinition = "CHAR(36)", updatable = false, nullable = false)
+    @Column(name = "shipment_id", length = 36, nullable = false, updatable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID shipmentId;
 
-    @Column(name = "order_id", columnDefinition = "CHAR(36)", nullable = false, unique = true)
+    @Column(name = "store_id", length = 36, nullable = false, updatable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
+    private UUID storeId;
+
+    @Column(name = "order_id", length = 36, nullable = false, unique = true)
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID orderId;
 
     @Column(nullable = false, length = 100)
@@ -51,7 +60,16 @@ public class Shipment {
     }
 
     public UUID getShipmentId()         { return shipmentId; }
+    public UUID getStoreId()            { return storeId; }
     public UUID getOrderId()            { return orderId; }
+
+    @PrePersist
+    public void prePersist() {
+        if (this.storeId == null) {
+            this.storeId = TenantContext.getStoreId();
+        }
+    }
+
     public String getCarrier()          { return carrier; }
     public String getTrackingNumber()   { return trackingNumber; }
     public BigDecimal getShippingFee()  { return shippingFee; }

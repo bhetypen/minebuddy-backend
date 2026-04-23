@@ -2,9 +2,12 @@ package com.minebuddy.model;
 
 import com.minebuddy.model.enums.OrderStatus;
 import com.minebuddy.model.enums.PaymentType;
+import com.minebuddy.security.TenantContext;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -15,13 +18,20 @@ import java.util.UUID;
 public class Order {
 
     @Id
-    @Column(name = "order_id", columnDefinition = "CHAR(36)", updatable = false, nullable = false)
+    @Column(name = "order_id", length = 36, nullable = false, updatable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID orderId;
 
-    @Column(name = "customer_id", columnDefinition = "CHAR(36)", nullable = false)
+    @Column(name = "store_id", length = 36, nullable = false, updatable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
+    private UUID storeId;
+
+    @Column(name = "customer_id", length = 36, nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID customerId;
 
-    @Column(name = "item_id", columnDefinition = "CHAR(36)", nullable = false)
+    @Column(name = "item_id", length = 36, nullable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID itemId;
 
     @Column(nullable = false)
@@ -118,7 +128,16 @@ public class Order {
     }
 
     public UUID getOrderId()                    { return orderId; }
+    public UUID getStoreId()                    { return storeId; }
     public UUID getCustomerId()                 { return customerId; }
+
+    @PrePersist
+    public void prePersist() {
+        if (this.storeId == null) {
+            this.storeId = TenantContext.getStoreId();
+        }
+    }
+
     public UUID getItemId()                     { return itemId; }
     public int getQuantity()                    { return quantity; }
     public PaymentType getPaymentType()         { return paymentType; }

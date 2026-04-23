@@ -27,13 +27,19 @@ public class JwtService {
 
     public String generateAccessToken(User user) {
         Instant now = Instant.now();
+        
+        java.util.HashMap<String, Object> claims = new java.util.HashMap<>();
+        claims.put("email", user.getEmail());
+        claims.put("name", user.getName());
+        claims.put("superAdmin", user.isSuperAdmin());
+        
+        if (user.getStore() != null) {
+            claims.put("storeId", user.getStore().getStoreId().toString());
+        }
+
         return Jwts.builder()
                 .subject(user.getUserId().toString())
-                .claims(Map.of(
-                        "email", user.getEmail(),
-                        "name", user.getName(),
-                        "superAdmin", user.isSuperAdmin()
-                ))
+                .claims(claims)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(accessTokenExpiryMillis)))
                 .signWith(signingKey)

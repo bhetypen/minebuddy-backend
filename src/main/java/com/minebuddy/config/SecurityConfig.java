@@ -1,6 +1,9 @@
 package com.minebuddy.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.minebuddy.dto.response.ErrorResponseDTO;
 import com.minebuddy.security.JwtAuthFilter;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,6 +23,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Configuration
@@ -38,6 +42,9 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        ObjectMapper localMapper = new ObjectMapper();
+        localMapper.findAndRegisterModules(); // Handle Java 8 Date/Time
+
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
@@ -53,6 +60,36 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/**").hasRole("SUPER_ADMIN")
 
                         .anyRequest().authenticated()
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+
+                            ErrorResponseDTO error = new ErrorResponseDTO(
+                                    401,
+                                    "Unauthorized",
+                                    "You must log in first.",
+                                    request.getRequestURI(),
+                                    LocalDateTime.now()
+                            );
+
+                            response.getWriter().write(localMapper.writeValueAsString(error));
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType("application/json");
+
+                            ErrorResponseDTO error = new ErrorResponseDTO(
+                                    403,
+                                    "Forbidden",
+                                    "You do not have permission to access this resource.",
+                                    request.getRequestURI(),
+                                    LocalDateTime.now()
+                            );
+
+                            response.getWriter().write(localMapper.writeValueAsString(error));
+                        })
                 )
                 .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

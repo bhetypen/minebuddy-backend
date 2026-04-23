@@ -2,6 +2,8 @@ package com.minebuddy.model;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -11,7 +13,8 @@ import java.util.UUID;
 public class User {
 
     @Id
-    @Column(name = "user_id", columnDefinition = "CHAR(36)", updatable = false, nullable = false)
+    @Column(name = "user_id", length = 36, nullable = false, updatable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
     private UUID userId;
 
     @Column(nullable = false, unique = true, length = 100)
@@ -28,6 +31,10 @@ public class User {
 
     @Column(name = "super_admin", nullable = false)
     private boolean superAdmin;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "store_id")
+    private Store store;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -50,9 +57,11 @@ public class User {
     public String getName() { return name; }
     public boolean isActive() { return active; }
     public boolean isSuperAdmin() { return superAdmin; }
+    public Store getStore() { return store; }
     public LocalDateTime getCreatedAt() { return createdAt; }
 
     public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
     public void setName(String name) { this.name = name; }
     public void setActive(boolean active) { this.active = active; }
+    public void setStore(Store store) { this.store = store; }
 }

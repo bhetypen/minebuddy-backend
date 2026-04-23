@@ -8,6 +8,7 @@ import com.minebuddy.repository.CustomerRepository;
 import com.minebuddy.repository.ItemRepository;
 import com.minebuddy.repository.OrderRepository;
 import com.minebuddy.repository.ShipmentRepository;
+import com.minebuddy.security.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,16 +51,17 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public DashboardStatsDTO getStats() {
-        List<Order> allOrders = orderRepo.findAll();
-        List<Shipment> allShipments = shipmentRepo.findAll();
+        UUID storeId = TenantContext.getStoreId();
+        List<Order> allOrders = orderRepo.findAllByStoreId(storeId);
+        List<Shipment> allShipments = shipmentRepo.findAllByStoreId(storeId);
 
         return new DashboardStatsDTO(
                 computeGrossRevenueThisMonth(allOrders),
                 computeUncollectedBalance(allOrders),
                 computeOrdersToShip(allOrders, allShipments),
                 computeOrdersInTransit(allShipments),
-                computeLowStockItems(),
-                customerRepo.count()
+                computeLowStockItems(storeId),
+                customerRepo.countByStoreId(storeId)
         );
     }
 
@@ -105,8 +107,8 @@ public class DashboardService {
     }
 
     // Items where stock is below the low-stock threshold AND the item is still active.
-    private long computeLowStockItems() {
-        return itemRepo.findAll().stream()
+    private long computeLowStockItems(UUID storeId) {
+        return itemRepo.findAllByStoreId(storeId).stream()
                 .filter(i -> i.isActive())
                 .filter(i -> i.getStock() < LOW_STOCK_THRESHOLD)
                 .count();

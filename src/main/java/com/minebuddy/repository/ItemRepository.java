@@ -10,13 +10,20 @@ import java.util.UUID;
 
 public interface ItemRepository extends JpaRepository<Item, UUID> {
 
+    List<Item> findAllByStoreId(UUID storeId);
+
     @Query("""
         SELECT i FROM Item i
-        WHERE LOWER(CAST(i.itemId AS string)) LIKE LOWER(CONCAT('%', :term, '%'))
+        WHERE i.storeId = :storeId
+          AND (LOWER(CAST(i.itemId AS string)) LIKE LOWER(CONCAT('%', :term, '%'))
            OR LOWER(i.name)     LIKE LOWER(CONCAT('%', :term, '%'))
            OR LOWER(i.liveName) LIKE LOWER(CONCAT('%', :term, '%'))
            OR LOWER(i.category) LIKE LOWER(CONCAT('%', :term, '%'))
-           OR CAST(i.createdAt AS string) LIKE CONCAT('%', :term, '%')
+           OR CAST(i.createdAt AS string) LIKE CONCAT('%', :term, '%'))
         """)
-    List<Item> search(@Param("term") String term);
+    List<Item> search(@Param("storeId") UUID storeId, @Param("term") String term);
+
+    java.util.Optional<Item> findByItemIdAndStoreId(UUID itemId, UUID storeId);
+    
+    boolean existsByItemIdAndStoreId(UUID itemId, UUID storeId);
 }

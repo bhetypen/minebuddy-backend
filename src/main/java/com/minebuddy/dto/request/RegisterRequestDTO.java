@@ -14,5 +14,9 @@ public record RegisterRequestDTO(
 
         @NotBlank(message = "Name is required")
         @Size(max = 100)
-        String name
+        String name,
+
+        @NotBlank(message = "Store Name is required")
+        @Size(max = 255)
+        String storeName
 ) {}

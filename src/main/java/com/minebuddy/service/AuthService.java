@@ -4,7 +4,9 @@ import com.minebuddy.dto.request.LoginRequestDTO;
 import com.minebuddy.dto.request.RegisterRequestDTO;
 import com.minebuddy.dto.response.LoginResponseDTO;
 import com.minebuddy.dto.response.UserResponseDTO;
+import com.minebuddy.model.Store;
 import com.minebuddy.model.User;
+import com.minebuddy.repository.StoreRepository;
 import com.minebuddy.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -16,15 +18,18 @@ import java.util.UUID;
 public class AuthService {
 
     private final UserRepository userRepo;
+    private final StoreRepository storeRepo;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
 
     public AuthService(UserRepository userRepo,
+                       StoreRepository storeRepo,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService,
                        RefreshTokenService refreshTokenService) {
         this.userRepo = userRepo;
+        this.storeRepo = storeRepo;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
@@ -36,13 +41,21 @@ public class AuthService {
             throw new AuthException("An account with this email already exists");
         }
 
+        // 1. Create the Store first
+        Store store = new Store();
+        store.setName(req.storeName().trim());
+        Store savedStore = storeRepo.save(store);
+
+        // 2. Create the User and link the Store
         User user = new User(
                 req.email().toLowerCase().trim(),
                 passwordEncoder.encode(req.password()),
                 req.name().trim()
         );
-        User saved = userRepo.save(user);
-        return toResponseDTO(saved);
+        user.setStore(savedStore);
+        
+        User savedUser = userRepo.save(user);
+        return toResponseDTO(savedUser);
     }
 
     @Transactional
@@ -60,6 +73,8 @@ public class AuthService {
 
         String accessToken = jwtService.generateAccessToken(user);
         RefreshTokenService.IssuedToken refresh = refreshTokenService.generateForUser(user.getUserId());
+
+        String storeId = (user.getStore() != null) ? user.getStore().getStoreId().toString() : null;
 
         return new LoginResponseDTO(
                 accessToken,

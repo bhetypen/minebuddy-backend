@@ -3,7 +3,9 @@ package com.minebuddy.service;
 import com.minebuddy.dto.request.CustomerRequestDTO;
 import com.minebuddy.model.Customer;
 import com.minebuddy.repository.CustomerRepository;
+import com.minebuddy.security.TenantContext;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -17,6 +19,7 @@ public class CustomerService {
         this.repo = repo;
     }
 
+    @Transactional
     public Customer registerCustomer(CustomerRequestDTO dto) {
         Customer customer = new Customer(
                 dto.fName(),
@@ -25,45 +28,37 @@ public class CustomerService {
                 dto.platform(),
                 dto.phone(),
                 dto.addressId(),
-                LocalDateTime.now()
+                null // Set by @PrePersist
         );
 
         return repo.save(customer);
     }
 
+    @Transactional(readOnly = true)
     public List<Customer> listAll() {
-        return repo.findAll();
+        UUID storeId = TenantContext.getStoreId();
+        return repo.findAllByStoreId(storeId);
     }
 
-    //Search Customer by name, handle, ID or phone number
+    @Transactional(readOnly = true)
     public List<Customer> searchCustomers(String searchTerm) {
-        if(searchTerm == null || searchTerm.isBlank()) {
+        if (searchTerm == null || searchTerm.isBlank()) {
             return List.of();
         }
 
-        String lower = searchTerm.toLowerCase().trim();
-
-        return repo.findAll().stream()
-                .filter(c -> c.getFirstName().toLowerCase().contains(lower)
-                        || c.getLastName().toLowerCase().contains(lower)
-                        || c.getFullName().toLowerCase().contains(lower)
-                        || c.getHandle().toLowerCase().contains(lower)
-                        || (c.getCustomerId() != null && c.getCustomerId().toString().toLowerCase().contains(lower))
-                        || c.getPhoneNumber().toLowerCase().contains(searchTerm))
-                .toList();
+        UUID storeId = TenantContext.getStoreId();
+        return repo.search(storeId, searchTerm.trim());
     }
 
-    //check if customer exists by ID
+    @Transactional(readOnly = true)
     public boolean existsById(UUID customerId) {
-        return repo.existsById(customerId);
+        UUID storeId = TenantContext.getStoreId();
+        return repo.existsByCustomerIdAndStoreId(customerId, storeId);
     }
 
-    //Find a single customer by ID
+    @Transactional(readOnly = true)
     public Customer findById(UUID customerId) {
-        return repo.findById(customerId).orElse(null);
+        UUID storeId = TenantContext.getStoreId();
+        return repo.findByCustomerIdAndStoreId(customerId, storeId).orElse(null);
     }
-
-
-
-
 }

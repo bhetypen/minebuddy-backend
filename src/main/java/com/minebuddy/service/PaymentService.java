@@ -8,6 +8,7 @@ import com.minebuddy.model.enums.OrderStatus;
 import com.minebuddy.model.enums.PaymentType;
 import com.minebuddy.repository.OrderRepository;
 import com.minebuddy.repository.PaymentRepository;
+import com.minebuddy.security.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +38,8 @@ public class PaymentService {
     // PREORDER only. Transitions RESERVED -> DP_PAID once dp requirement is met.
     @Transactional
     public PaymentResponseDTO processDownPayment(PaymentRequestDTO req) {
-        Order order = orderRepo.findById(req.orderId()).orElse(null);
+        UUID storeId = TenantContext.getStoreId();
+        Order order = orderRepo.findByOrderIdAndStoreId(req.orderId(), storeId).orElse(null);
         if (order == null) {
             this.message = "Order not found.";
             return null;
@@ -82,7 +84,8 @@ public class PaymentService {
     // ONHAND or PREORDER. Transitions to FULLY_PAID once balance hits zero.
     @Transactional
     public PaymentResponseDTO processFinalPayment(PaymentRequestDTO req) {
-        Order order = orderRepo.findById(req.orderId()).orElse(null);
+        UUID storeId = TenantContext.getStoreId();
+        Order order = orderRepo.findByOrderIdAndStoreId(req.orderId(), storeId).orElse(null);
         if (order == null) {
             this.message = "Order not found.";
             return null;
@@ -122,21 +125,24 @@ public class PaymentService {
 
     @Transactional(readOnly = true)
     public List<PaymentResponseDTO> getPaymentsByOrderId(UUID orderId) {
-        return paymentRepo.findByOrderId(orderId).stream()
+        UUID storeId = TenantContext.getStoreId();
+        return paymentRepo.findByOrderIdAndStoreId(orderId, storeId).stream()
                 .map(this::toResponseDTO)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<PaymentResponseDTO> getAllPayments() {
-        return paymentRepo.findAll().stream()
+        UUID storeId = TenantContext.getStoreId();
+        return paymentRepo.findAllByStoreId(storeId).stream()
                 .map(this::toResponseDTO)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public Optional<PaymentResponseDTO> findById(UUID paymentId) {
-        return paymentRepo.findById(paymentId).map(this::toResponseDTO);
+        UUID storeId = TenantContext.getStoreId();
+        return paymentRepo.findByPaymentIdAndStoreId(paymentId, storeId).map(this::toResponseDTO);
     }
 
     // ---- Helpers ----

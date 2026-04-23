@@ -1,6 +1,7 @@
 package com.minebuddy.model;
 
 import com.minebuddy.model.enums.SaleType;
+import com.minebuddy.security.TenantContext;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -15,6 +16,9 @@ public class Item {
     @Id
     @Column(name = "item_id", columnDefinition = "CHAR(36)", updatable = false, nullable = false)
     private UUID itemId;
+
+    @Column(name = "store_id", columnDefinition = "CHAR(36)", nullable = false)
+    private UUID storeId;
 
     @Column(nullable = false)
     private String name;
@@ -67,8 +71,16 @@ public class Item {
         this.stock += quantity;
     }
 
+    @PrePersist
+    public void prePersist() {
+        if (this.storeId == null) {
+            this.storeId = TenantContext.getStoreId();
+        }
+    }
+
     // Getters
     public UUID getItemId()             { return itemId; }
+    public UUID getStoreId()            { return storeId; }
     public String getName()             { return name; }
     public String getLiveName()         { return liveName; }
     public String getCategory()         { return category; }

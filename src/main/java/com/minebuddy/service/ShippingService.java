@@ -8,6 +8,7 @@ import com.minebuddy.model.Shipment;
 import com.minebuddy.model.enums.OrderStatus;
 import com.minebuddy.repository.OrderRepository;
 import com.minebuddy.repository.ShipmentRepository;
+import com.minebuddy.security.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,7 +52,9 @@ public class ShippingService {
             return null;
         }
 
-        if (shipmentRepo.findByOrderId(request.orderId()).isPresent()) {
+        UUID storeId = TenantContext.getStoreId();
+
+        if (shipmentRepo.findByOrderIdAndStoreId(request.orderId(), storeId).isPresent()) {
             this.message = "Shipment already exists for this order.";
             return null;
         }
@@ -122,7 +125,9 @@ public class ShippingService {
 
     @Transactional(readOnly = true)
     public Optional<ShipmentResponseDTO> findByOrderId(UUID orderId) {
-        return shipmentRepo.findByOrderId(orderId).map(this::toResponseDTO);
+        UUID storeId = TenantContext.getStoreId();
+        return shipmentRepo.findByOrderIdAndStoreId(orderId, storeId)
+                .map(this::toResponseDTO);
     }
 
     @Transactional(readOnly = true)

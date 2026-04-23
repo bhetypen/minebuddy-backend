@@ -13,6 +13,7 @@ import com.minebuddy.repository.CustomerRepository;
 import com.minebuddy.repository.ItemRepository;
 import com.minebuddy.repository.OrderRepository;
 import com.minebuddy.repository.ShipmentRepository;
+import com.minebuddy.security.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -50,12 +51,13 @@ public class OrderService {
 
     @Transactional
     public OrderResponseDTO createOrder(OrderRequestDTO request) {
-        if (!customerRepo.existsById(request.customerId())) {
+        UUID storeId = TenantContext.getStoreId();
+        if (!customerRepo.existsByCustomerIdAndStoreId(request.customerId(), storeId)) {
             this.message = "Customer not found.";
             return null;
         }
 
-        Item item = itemRepo.findById(request.itemId()).orElse(null);
+        Item item = itemRepo.findByItemIdAndStoreId(request.itemId(), storeId).orElse(null);
         if (item == null || !item.isActive()) {
             this.message = "Item not found or inactive.";
             return null;
@@ -70,7 +72,8 @@ public class OrderService {
 
     @Transactional
     public boolean updateStatus(UUID orderId, OrderStatus nextStatus) {
-        Order order = orderRepo.findById(orderId).orElse(null);
+        UUID storeId = TenantContext.getStoreId();
+        Order order = orderRepo.findByOrderIdAndStoreId(orderId, storeId).orElse(null);
         if (order == null || nextStatus == null) {
             this.message = "Order not found.";
             return false;
@@ -91,7 +94,7 @@ public class OrderService {
             }
         }
 
-        Item item = itemRepo.findById(order.getItemId()).orElse(null);
+        Item item = itemRepo.findByItemIdAndStoreId(order.getItemId(), storeId).orElse(null);
         if (item == null) {
             this.message = "Item data missing; cannot validate workflow.";
             return false;
@@ -116,7 +119,7 @@ public class OrderService {
                 return false;
             }
 
-            boolean hasTracking = shipmentRepo.findByOrderId(orderId)
+            boolean hasTracking = shipmentRepo.findByOrderIdAndStoreId(orderId, storeId)
                     .map(s -> s.getTrackingNumber() != null && !s.getTrackingNumber().isBlank())
                     .orElse(false);
 
@@ -150,7 +153,7 @@ public class OrderService {
                 return false;
             }
 
-            Optional<Shipment> shipmentOpt = shipmentRepo.findByOrderId(orderId);
+            Optional<Shipment> shipmentOpt = shipmentRepo.findByOrderIdAndStoreId(orderId, storeId);
             if (shipmentOpt.isEmpty()) {
                 this.message = "Fulfillment Error: Cannot complete order without shipment.";
                 return false;
@@ -176,7 +179,8 @@ public class OrderService {
 
     @Transactional
     public boolean editOrder(UUID orderId, UUID newItemId, int newQty, BigDecimal newShippingFee) {
-        Order order = orderRepo.findById(orderId).orElse(null);
+        UUID storeId = TenantContext.getStoreId();
+        Order order = orderRepo.findByOrderIdAndStoreId(orderId, storeId).orElse(null);
 
         if (order == null || rank(order.getStatus()) >= 4 || newQty <= 0) {
             this.message = "Edit denied: Order is "
@@ -184,7 +188,7 @@ public class OrderService {
             return false;
         }
 
-        Item newItem = itemRepo.findById(newItemId).orElse(null);
+        Item newItem = itemRepo.findByItemIdAndStoreId(newItemId, storeId).orElse(null);
         if (newItem == null) {
             this.message = "New item not found.";
             return false;
@@ -195,7 +199,7 @@ public class OrderService {
             return false;
         }
 
-        itemRepo.findById(order.getItemId()).ifPresent(oldItem -> {
+        itemRepo.findByItemIdAndStoreId(order.getItemId(), storeId).ifPresent(oldItem -> {
             if (oldItem.getSaleType() != SaleType.PREORDER_ONLY) {
                 oldItem.increaseStock(order.getQuantity());
                 itemRepo.save(oldItem);
@@ -237,7 +241,8 @@ public class OrderService {
 
     @Transactional
     public boolean cancelOrder(UUID orderId) {
-        Order order = orderRepo.findById(orderId).orElse(null);
+        UUID storeId = TenantContext.getStoreId();
+        Order order = orderRepo.findByOrderIdAndStoreId(orderId, storeId).orElse(null);
         if (order == null || isTerminal(order.getStatus())) {
             this.message = "Order cannot be cancelled.";
             return false;
@@ -249,7 +254,7 @@ public class OrderService {
             return false;
         }
 
-        itemRepo.findById(order.getItemId()).ifPresent(item -> {
+        itemRepo.findByItemIdAndStoreId(order.getItemId(), storeId).ifPresent(item -> {
             if (item.getSaleType() != SaleType.PREORDER_ONLY) {
                 item.increaseStock(order.getQuantity());
                 itemRepo.save(item);
@@ -264,7 +269,8 @@ public class OrderService {
 
     @Transactional
     public int processBatchArrival(UUID itemId) {
-        List<Order> orders = orderRepo.findByItemIdAndStatus(itemId, OrderStatus.ORDERED_FROM_SUPPLIER);
+        UUID storeId = TenantContext.getStoreId();
+        List<Order> orders = orderRepo.findByItemIdAndStatusAndStoreId(itemId, OrderStatus.ORDERED_FROM_SUPPLIER, storeId);
 
         for (Order order : orders) {
             order.setStatus(OrderStatus.ARRIVED);
@@ -276,29 +282,34 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<OrderResponseDTO> findAll() {
-        return orderRepo.findAll().stream().map(this::toResponseDTO).toList();
+        UUID storeId = TenantContext.getStoreId();
+        return orderRepo.findAllByStoreId(storeId).stream().map(this::toResponseDTO).toList();
     }
 
     @Transactional(readOnly = true)
     public Optional<OrderResponseDTO> findById(UUID id) {
-        return orderRepo.findById(id).map(this::toResponseDTO);
+        UUID storeId = TenantContext.getStoreId();
+        return orderRepo.findByOrderIdAndStoreId(id, storeId).map(this::toResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public List<OrderResponseDTO> searchOrders(String query) {
         if (query == null || query.isBlank()) return List.of();
-        return orderRepo.search(query.trim()).stream().map(this::toResponseDTO).toList();
+        UUID storeId = TenantContext.getStoreId();
+        return orderRepo.search(storeId, query.trim()).stream().map(this::toResponseDTO).toList();
     }
 
     @Transactional(readOnly = true)
     public Optional<OrderSummaryDTO> findSummaryById(UUID orderId) {
-        return orderRepo.findById(orderId).map(this::toSummaryDTO);
+        UUID storeId = TenantContext.getStoreId();
+        return orderRepo.findByOrderIdAndStoreId(orderId, storeId).map(this::toSummaryDTO);
     }
 
     @Transactional(readOnly = true)
     public List<OrderSummaryDTO> getAllOrderSummaries() {
-        List<Shipment> allShipments = shipmentRepo.findAll();
-        return orderRepo.findAll().stream()
+        UUID storeId = TenantContext.getStoreId();
+        List<Shipment> allShipments = shipmentRepo.findAllByStoreId(storeId);
+        return orderRepo.findAllByStoreId(storeId).stream()
                 .map(order -> {
                     Shipment shipment = allShipments.stream()
                             .filter(s -> s.getOrderId().equals(order.getOrderId()))
@@ -450,11 +461,12 @@ public class OrderService {
     }
 
     private OrderSummaryDTO toSummaryDTO(Order o, Shipment s) {
-        String customerName = customerRepo.findById(o.getCustomerId())
+        UUID storeId = TenantContext.getStoreId();
+        String customerName = customerRepo.findByCustomerIdAndStoreId(o.getCustomerId(), storeId)
                 .map(c -> c.getFirstName() + " " + c.getLastName())
                 .orElse("Unknown Customer");
 
-        String itemName = itemRepo.findById(o.getItemId())
+        String itemName = itemRepo.findByItemIdAndStoreId(o.getItemId(), storeId)
                 .map(Item::getName)
                 .orElse("Unknown Item");
 

@@ -1,5 +1,6 @@
 package com.minebuddy.model;
 
+import com.minebuddy.security.TenantContext;
 import jakarta.persistence.*;
 
 import org.hibernate.annotations.JdbcTypeCode;
@@ -17,6 +18,10 @@ public class Customer {
     @Column(name = "customer_id", nullable = false, updatable = false, length = 36)
     @JdbcTypeCode(SqlTypes.CHAR)
     private UUID customerId;
+
+    @Column(name = "store_id", length = 36, nullable = false, updatable = false)
+    @JdbcTypeCode(SqlTypes.CHAR)
+    private UUID storeId;
 
     @Column(name = "first_name", nullable = false)
     private String firstName;
@@ -62,7 +67,19 @@ public class Customer {
 
     public UUID getCustomerId() {return customerId;}
 
+    public UUID getStoreId() { return storeId; }
+
     public String getFirstName() { return firstName;}
+
+    @PrePersist
+    public void prePersist() {
+        if (this.storeId == null) {
+            this.storeId = TenantContext.getStoreId();
+        }
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
+    }
 
     public String getLastName() {
         return lastName;

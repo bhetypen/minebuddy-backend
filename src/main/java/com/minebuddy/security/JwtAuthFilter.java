@@ -1,5 +1,6 @@
 package com.minebuddy.security;
 
+import com.minebuddy.security.TenantContext;
 import com.minebuddy.service.JwtService;
 import com.minebuddy.service.UserDetailsServiceImpl;
 import io.jsonwebtoken.Claims;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
@@ -35,16 +37,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull FilterChain chain
     ) throws ServletException, IOException {
 
-        String authHeader = request.getHeader("Authorization");
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            chain.doFilter(request, response);
-            return;
-        }
-
-        String token = authHeader.substring(7);
-
         try {
+            String authHeader = request.getHeader("Authorization");
+
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                chain.doFilter(request, response);
+                return;
+            }
+
+            String token = authHeader.substring(7);
+
             if (!jwtService.isTokenValid(token)) {
                 chain.doFilter(request, response);
                 return;
@@ -52,6 +54,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
             Claims claims = jwtService.parseToken(token);
             String email = claims.get("email", String.class);
+            String storeIdStr = claims.get("storeId", String.class);
+
+            if (storeIdStr != null) {
+                TenantContext.setStoreId(UUID.fromString(storeIdStr));
+            }
 
             if (SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
@@ -66,10 +73,13 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
+            
+            chain.doFilter(request, response);
         } catch (Exception e) {
             SecurityContextHolder.clearContext();
+            chain.doFilter(request, response);
+        } finally {
+            TenantContext.clear();
         }
-
-        chain.doFilter(request, response);
     }
 }

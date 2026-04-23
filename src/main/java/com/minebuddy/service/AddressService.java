@@ -4,6 +4,7 @@ import com.minebuddy.dto.request.AddressRequestDTO;
 import com.minebuddy.dto.response.AddressResponseDTO;
 import com.minebuddy.model.Address;
 import com.minebuddy.repository.AddressRepository;
+import com.minebuddy.security.TenantContext;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -28,13 +29,15 @@ public class AddressService {
         address.setRegion(dto.region());
         address.setZip(dto.zip());
         address.setLandmark(dto.landmark());
+        // storeId is set automatically via @PrePersist
 
         Address saved = addressRepository.save(address);
         return toResponseDTO(saved);
     }
 
     public List<AddressResponseDTO> listAll() {
-        return addressRepository.findAll()
+        UUID storeId = TenantContext.getStoreId();
+        return addressRepository.findAllByStoreId(storeId)
                 .stream()
                 .map(this::toResponseDTO)
                 .toList();
@@ -45,9 +48,10 @@ public class AddressService {
             return List.of();
         }
 
+        UUID storeId = TenantContext.getStoreId();
         return addressRepository
-                .findByCity(
-                        searchTerm, searchTerm, searchTerm, searchTerm
+                .findByStoreIdAndCityContainingIgnoreCaseOrStoreIdAndProvinceContainingIgnoreCaseOrStoreIdAndBarangayContainingIgnoreCaseOrStoreIdAndLine1ContainingIgnoreCase(
+                        storeId, searchTerm, storeId, searchTerm, storeId, searchTerm, storeId, searchTerm
                 )
                 .stream()
                 .map(this::toResponseDTO)
@@ -55,11 +59,13 @@ public class AddressService {
     }
 
     public boolean existsById(String addressId) {
-        return addressRepository.existsById(UUID.fromString(addressId));
+        UUID storeId = TenantContext.getStoreId();
+        return addressRepository.existsByAddressIdAndStoreId(UUID.fromString(addressId), storeId);
     }
 
     public AddressResponseDTO getAddressById(String addressId) {
-        Address address = addressRepository.findById(UUID.fromString(addressId))
+        UUID storeId = TenantContext.getStoreId();
+        Address address = addressRepository.findByAddressIdAndStoreId(UUID.fromString(addressId), storeId)
                 .orElseThrow(() -> new RuntimeException("Address not found: " + addressId));
 
         return toResponseDTO(address);

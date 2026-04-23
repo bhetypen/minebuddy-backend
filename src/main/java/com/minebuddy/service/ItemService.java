@@ -3,6 +3,7 @@ package com.minebuddy.service;
 import com.minebuddy.dto.request.ItemRequestDTO;
 import com.minebuddy.model.Item;
 import com.minebuddy.repository.ItemRepository;
+import com.minebuddy.security.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,17 +29,20 @@ public class ItemService {
                 req.saleType()
         );
         item.setLiveName(req.liveName());
+        // storeId is set automatically via @PrePersist in the Item entity
         return itemRepo.save(item);
     }
 
     @Transactional(readOnly = true)
     public Item findById(UUID itemId) {
-        return itemRepo.findById(itemId).orElse(null);
+        UUID storeId = TenantContext.getStoreId();
+        return itemRepo.findByItemIdAndStoreId(itemId, storeId).orElse(null);
     }
 
     @Transactional(readOnly = true)
     public List<Item> listAll() {
-        return itemRepo.findAll();
+        UUID storeId = TenantContext.getStoreId();
+        return itemRepo.findAllByStoreId(storeId);
     }
 
     @Transactional(readOnly = true)
@@ -46,11 +50,13 @@ public class ItemService {
         if (searchTerm == null || searchTerm.isBlank()) {
             return List.of();
         }
-        return itemRepo.search(searchTerm.trim());
+        UUID storeId = TenantContext.getStoreId();
+        return itemRepo.search(storeId, searchTerm.trim());
     }
 
     @Transactional(readOnly = true)
     public boolean existsById(UUID itemId) {
-        return itemRepo.existsById(itemId);
+        UUID storeId = TenantContext.getStoreId();
+        return itemRepo.existsByItemIdAndStoreId(itemId, storeId);
     }
 }
