@@ -44,6 +44,9 @@ public class Order {
     @Column(name = "unit_price_at_order_time", nullable = false, precision = 10, scale = 2)
     private BigDecimal unitPriceAtOrderTime;
 
+    @Column(name = "unit_cost_at_order_time", nullable = false, precision = 10, scale = 2)
+    private BigDecimal unitCostAtOrderTime;
+
     // Item subtotal: unitPrice × quantity. Does not include shipping.
     @Column(name = "item_total", nullable = false, precision = 10, scale = 2)
     private BigDecimal itemTotal;
@@ -83,14 +86,15 @@ public class Order {
     protected Order() {}
 
     public Order(UUID customerId, UUID itemId, int quantity, PaymentType paymentType,
-                 BigDecimal unitPriceAtOrderTime, BigDecimal itemTotal,
-                 BigDecimal shippingFee, BigDecimal dpRequired) {
+                 BigDecimal unitPriceAtOrderTime, BigDecimal unitCostAtOrderTime, 
+                 BigDecimal itemTotal, BigDecimal shippingFee, BigDecimal dpRequired) {
         this.orderId = UUID.randomUUID();
         this.customerId = customerId;
         this.itemId = itemId;
         this.quantity = quantity;
         this.paymentType = paymentType;
         this.unitPriceAtOrderTime = unitPriceAtOrderTime;
+        this.unitCostAtOrderTime = (unitCostAtOrderTime != null) ? unitCostAtOrderTime : BigDecimal.ZERO;
         this.itemTotal = itemTotal;
         this.shippingFee = (shippingFee != null) ? shippingFee : BigDecimal.ZERO;
         this.totalAmount = this.itemTotal.add(this.shippingFee);
@@ -142,6 +146,7 @@ public class Order {
     public int getQuantity()                    { return quantity; }
     public PaymentType getPaymentType()         { return paymentType; }
     public BigDecimal getUnitPriceAtOrderTime() { return unitPriceAtOrderTime; }
+    public BigDecimal getUnitCostAtOrderTime()  { return unitCostAtOrderTime; }
     public BigDecimal getItemTotal()            { return itemTotal; }
     public BigDecimal getShippingFee()          { return shippingFee; }
     public BigDecimal getTotalAmount()          { return totalAmount; }
@@ -156,6 +161,7 @@ public class Order {
     public void setItemId(UUID itemId)                              { this.itemId = itemId; }
     public void setQuantity(int quantity)                           { this.quantity = quantity; }
     public void setUnitPriceAtOrderTime(BigDecimal p)               { this.unitPriceAtOrderTime = p; }
+    public void setUnitCostAtOrderTime(BigDecimal c)                { this.unitCostAtOrderTime = c; }
     public void setItemTotal(BigDecimal itemTotal)                  { this.itemTotal = itemTotal; recalculateTotals(); }
     public void setShippingFee(BigDecimal shippingFee)              { this.shippingFee = shippingFee; recalculateTotals(); }
     public void setTotalAmount(BigDecimal totalAmount)              { this.totalAmount = totalAmount; recalculateBalance(); }
@@ -164,4 +170,5 @@ public class Order {
     public void setFinalPaid(BigDecimal finalPaid)                  { this.finalPaid = finalPaid; recalculateBalance(); }
     public void setBalance(BigDecimal balance)                      { this.balance = balance; }
     public void setStatus(OrderStatus status)                       { this.status = status; }
+
 }

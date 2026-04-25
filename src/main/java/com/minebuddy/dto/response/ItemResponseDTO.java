@@ -12,6 +12,7 @@ public record ItemResponseDTO(
         String category,
         SaleType saleType,
         BigDecimal price,
+        BigDecimal cost,
         int stock,
         boolean active,
         LocalDateTime createdAt

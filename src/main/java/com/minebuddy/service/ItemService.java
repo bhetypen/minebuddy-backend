@@ -25,6 +25,7 @@ public class ItemService {
                 req.name(),
                 req.category(),
                 req.price(),
+                req.cost(),
                 req.stock(),
                 req.saleType()
         );

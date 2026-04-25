@@ -10,6 +10,7 @@ import com.minebuddy.repository.AddressRepository;
 import com.minebuddy.repository.CustomerRepository;
 import com.minebuddy.repository.ItemRepository;
 import com.minebuddy.repository.OrderRepository;
+import com.minebuddy.security.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,14 +38,16 @@ public class ShippingLabelService {
 
     @Transactional(readOnly = true)
     public Optional<ShippingLabelDTO> createLabel(UUID orderId) {
-        Order order = orderRepo.findById(orderId).orElse(null);
+        UUID storeId = TenantContext.getStoreId();
+        
+        Order order = orderRepo.findByOrderIdAndStoreId(orderId, storeId).orElse(null);
         if (order == null) return Optional.empty();
 
-        Customer customer = customerRepo.findById(order.getCustomerId()).orElse(null);
+        Customer customer = customerRepo.findByCustomerIdAndStoreId(order.getCustomerId(), storeId).orElse(null);
         if (customer == null) return Optional.empty();
 
-        Address address = addressRepo.findById(customer.getAddressId()).orElse(null);
-        Item item = itemRepo.findById(order.getItemId()).orElse(null);
+        Address address = addressRepo.findByAddressIdAndStoreId(customer.getAddressId(), storeId).orElse(null);
+        Item item = itemRepo.findByItemIdAndStoreId(order.getItemId(), storeId).orElse(null);
 
         String customerName = customer.getFirstName() + " " + customer.getLastName();
         String fullAddress = formatAddress(address);
@@ -67,7 +70,8 @@ public class ShippingLabelService {
 
     @Transactional(readOnly = true)
     public List<ShippingLabelDTO> getPendingLabels() {
-        return orderRepo.findAll().stream()
+        UUID storeId = TenantContext.getStoreId();
+        return orderRepo.findAllByStoreId(storeId).stream()
                 .filter(o -> o.getStatus() == OrderStatus.FULLY_PAID
                           || o.getStatus() == OrderStatus.PACKED)
                 .map(o -> createLabel(o.getOrderId()).orElse(null))
@@ -77,7 +81,8 @@ public class ShippingLabelService {
 
     @Transactional(readOnly = true)
     public long getReadyToShipCount() {
-        return orderRepo.findAll().stream()
+        UUID storeId = TenantContext.getStoreId();
+        return orderRepo.findAllByStoreId(storeId).stream()
                 .filter(o -> o.getStatus() == OrderStatus.FULLY_PAID
                           || o.getStatus() == OrderStatus.PACKED)
                 .count();

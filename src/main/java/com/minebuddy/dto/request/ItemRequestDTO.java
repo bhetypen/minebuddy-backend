@@ -22,6 +22,11 @@ public record ItemRequestDTO(
         @Digits(integer = 8, fraction = 2, message = "Price must have at most 2 decimal places")
         BigDecimal price,
 
+        @NotNull(message = "Cost is required")
+        @DecimalMin(value = "0.00", message = "Cost must be non-negative")
+        @Digits(integer = 8, fraction = 2, message = "Cost must have at most 2 decimal places")
+        BigDecimal cost,
+
         @Min(value = 0, message = "Stock must be non-negative")
         int stock,
 

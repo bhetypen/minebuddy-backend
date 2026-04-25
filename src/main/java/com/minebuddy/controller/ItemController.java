@@ -59,6 +59,7 @@ public class ItemController {
                 item.getCategory(),
                 item.getSaleType(),
                 item.getPrice(),
+                item.getCost(),
                 item.getStock(),
                 item.isActive(),
                 item.getCreatedAt()

@@ -113,7 +113,11 @@ public class PaymentService {
         order.addFinalPayment(req.amount());
 
         if (order.getBalance().compareTo(BigDecimal.ZERO) <= 0) {
-            order.setStatus(OrderStatus.FULLY_PAID);
+            // Only update status to FULLY_PAID if it's currently at an earlier stage.
+            // This prevents moving backwards from PACKED or SHIPPED.
+            if (rank(order.getStatus()) < rank(OrderStatus.FULLY_PAID)) {
+                order.setStatus(OrderStatus.FULLY_PAID);
+            }
         }
 
         Payment saved = persistTransaction(req);
@@ -121,6 +125,21 @@ public class PaymentService {
 
         this.message = "Final payment recorded.";
         return toResponseDTO(saved);
+    }
+
+    private int rank(OrderStatus s) {
+        return switch (s) {
+            case RESERVED -> 1;
+            case DP_PAID -> 2;
+            case FOR_ORDERING -> 3;
+            case ORDERED_FROM_SUPPLIER -> 4;
+            case ARRIVED -> 5;
+            case FULLY_PAID -> 6;
+            case PACKED -> 7;
+            case SHIPPED -> 8;
+            case COMPLETED -> 9;
+            case CANCELLED -> 99;
+        };
     }
 
     @Transactional(readOnly = true)

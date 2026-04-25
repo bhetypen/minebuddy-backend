@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 public record DashboardStatsDTO(
         // Money
         BigDecimal grossRevenueThisMonth,
+        BigDecimal netProfitThisMonth,
         BigDecimal uncollectedBalance,
 
         // Work queue

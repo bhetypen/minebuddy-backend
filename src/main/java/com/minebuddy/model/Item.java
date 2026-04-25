@@ -34,6 +34,9 @@ public class Item {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;
 
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal cost;
+
     @Column(nullable = false)
     private int stock;
 
@@ -50,11 +53,12 @@ public class Item {
 
     protected Item() {}
 
-    public Item(String name, String category, BigDecimal price, int stock, SaleType saleType) {
+    public Item(String name, String category, BigDecimal price, BigDecimal cost, int stock, SaleType saleType) {
         this.itemId = UUID.randomUUID();
         this.name = name;
         this.category = category;
         this.price = price;
+        this.cost = (cost != null) ? cost : BigDecimal.ZERO;
         this.stock = stock;
         this.active = true;
         this.saleType = (saleType != null) ? saleType : SaleType.ONHAND_ONLY;
@@ -85,6 +89,7 @@ public class Item {
     public String getLiveName()         { return liveName; }
     public String getCategory()         { return category; }
     public BigDecimal getPrice()        { return price; }
+    public BigDecimal getCost()         { return cost; }
     public int getStock()               { return stock; }
     public boolean isActive()           { return active; }
     public SaleType getSaleType()       { return saleType; }
@@ -92,6 +97,7 @@ public class Item {
 
     // Setters
     public void setLiveName(String liveName) { this.liveName = liveName; }
+    public void setCost(BigDecimal cost) { this.cost = cost; }
     public void setStock(int stock) { this.stock = stock; }
     public void setActive(boolean active) { this.active = active; }
 }

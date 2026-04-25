@@ -130,17 +130,35 @@ public class OrderService {
         }
 
         if (rank(nextStatus) >= rank(OrderStatus.PACKED) && nextStatus != OrderStatus.CANCELLED) {
-            boolean needsArrival = item.getSaleType() == SaleType.PREORDER_ONLY
-                    || (item.getSaleType() == SaleType.HYBRID
-                    && rank(order.getStatus()) >= rank(OrderStatus.ORDERED_FROM_SUPPLIER));
+            boolean needsArrival = false;
 
-            if (needsArrival && order.getStatus() != OrderStatus.ARRIVED) {
+            if (item.getSaleType() == SaleType.PREORDER_ONLY) {
+                needsArrival = true;
+            } else if (item.getSaleType() == SaleType.HYBRID) {
+                // For Hybrid, only orders that actually went through the ordering process need arrival.
+                // If it's still RESERVED or jumped to FULLY_PAID from RESERVED, it's an on-hand part.
+                needsArrival = order.getPaymentType() == PaymentType.PREORDER 
+                        || rank(order.getStatus()) == rank(OrderStatus.FOR_ORDERING)
+                        || rank(order.getStatus()) == rank(OrderStatus.ORDERED_FROM_SUPPLIER);
+            }
+
+            // Allow PACKED/SHIPPED if it is currently ARRIVED OR if it is already FULLY_PAID
+            // (assuming arrival happened or is implied if the user is packing/shipping).
+            if (needsArrival && order.getStatus() != OrderStatus.ARRIVED && order.getStatus() != OrderStatus.FULLY_PAID) {
                 this.message = "Logistics Error: Item has not arrived from the supplier yet.";
                 return false;
             }
         }
 
+        if (rank(nextStatus) >= rank(OrderStatus.PACKED) && nextStatus != OrderStatus.CANCELLED) {
+            if (order.getBalance().compareTo(BigDecimal.ZERO) > 0) {
+                this.message = "Financial Error: Balance must be zero before packing or shipping.";
+                return false;
+            }
+        }
+
         if (rank(nextStatus) >= rank(OrderStatus.SHIPPED) && nextStatus != OrderStatus.CANCELLED) {
+            // Already checked balance for PACKED, but keeping this as a double-guard
             if (order.getBalance().compareTo(BigDecimal.ZERO) > 0) {
                 this.message = "Financial Error: Balance must be zero before shipping.";
                 return false;
@@ -222,6 +240,7 @@ public class OrderService {
         order.setItemId(newItemId);
         order.setQuantity(newQty);
         order.setUnitPriceAtOrderTime(newItem.getPrice());
+        order.setUnitCostAtOrderTime(newItem.getCost());
         order.setItemTotal(newItemTotal);
         order.setShippingFee(finalShippingFee);
         order.setDpRequired(newDpReq);
@@ -245,6 +264,11 @@ public class OrderService {
         Order order = orderRepo.findByOrderIdAndStoreId(orderId, storeId).orElse(null);
         if (order == null || isTerminal(order.getStatus())) {
             this.message = "Order cannot be cancelled.";
+            return false;
+        }
+
+        if (rank(order.getStatus()) >= rank(OrderStatus.SHIPPED)) {
+            this.message = "Cannot cancel: Order is already in transit.";
             return false;
         }
 
@@ -390,6 +414,7 @@ public class OrderService {
     private Order buildOrderWithFee(OrderRequestDTO request, Item item, int quantity,
                                     PaymentType paymentType, BigDecimal shippingFee) {
         BigDecimal unitPrice = item.getPrice();
+        BigDecimal unitCost = item.getCost();
         BigDecimal itemTotal = unitPrice.multiply(BigDecimal.valueOf(quantity));
         BigDecimal fee = (shippingFee != null) ? shippingFee : BigDecimal.ZERO;
         BigDecimal total = itemTotal.add(fee);
@@ -410,6 +435,7 @@ public class OrderService {
                 quantity,
                 paymentType,
                 unitPrice,
+                unitCost,
                 itemTotal,
                 fee,
                 dpReq

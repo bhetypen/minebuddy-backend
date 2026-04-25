@@ -41,7 +41,9 @@ public class ShippingService {
 
     @Transactional
     public ShipmentResponseDTO createShipment(CreateShipmentRequestDTO request) {
-        Order order = orderRepo.findById(request.orderId()).orElse(null);
+        UUID storeId = TenantContext.getStoreId();
+        
+        Order order = orderRepo.findByOrderIdAndStoreId(request.orderId(), storeId).orElse(null);
         if (order == null) {
             this.message = "Order not found.";
             return null;
@@ -51,8 +53,6 @@ public class ShippingService {
             this.message = "Order must be FULLY_PAID or PACKED before creating a shipment.";
             return null;
         }
-
-        UUID storeId = TenantContext.getStoreId();
 
         if (shipmentRepo.findByOrderIdAndStoreId(request.orderId(), storeId).isPresent()) {
             this.message = "Shipment already exists for this order.";
@@ -76,7 +76,8 @@ public class ShippingService {
 
     @Transactional
     public boolean updateShipmentStatus(UUID shipmentId, UpdateShipmentStatusRequestDTO request) {
-        Shipment shipment = shipmentRepo.findById(shipmentId).orElse(null);
+        UUID storeId = TenantContext.getStoreId();
+        Shipment shipment = shipmentRepo.findByShipmentIdAndStoreId(shipmentId, storeId).orElse(null);
         if (shipment == null) {
             this.message = "Shipment not found.";
             return false;
@@ -95,7 +96,7 @@ public class ShippingService {
         shipment.setShipmentStatus(newStatus);
         shipmentRepo.save(shipment);
 
-        cascadeOrderStatus(shipment.getOrderId(), newStatus);
+        cascadeOrderStatus(shipment.getOrderId(), newStatus, storeId);
 
         this.message = "Shipment status updated to " + newStatus + ".";
         return true;
@@ -103,7 +104,8 @@ public class ShippingService {
 
     @Transactional
     public boolean markDelivered(UUID shipmentId) {
-        Shipment shipment = shipmentRepo.findById(shipmentId).orElse(null);
+        UUID storeId = TenantContext.getStoreId();
+        Shipment shipment = shipmentRepo.findByShipmentIdAndStoreId(shipmentId, storeId).orElse(null);
         if (shipment == null) {
             this.message = "Shipment not found.";
             return false;
@@ -112,7 +114,7 @@ public class ShippingService {
         shipment.setShipmentStatus("DELIVERED");
         shipmentRepo.save(shipment);
 
-        cascadeOrderStatus(shipment.getOrderId(), "DELIVERED");
+        cascadeOrderStatus(shipment.getOrderId(), "DELIVERED", storeId);
 
         this.message = "Shipment marked as DELIVERED. Order is now COMPLETED.";
         return true;
@@ -120,7 +122,8 @@ public class ShippingService {
 
     @Transactional(readOnly = true)
     public List<ShipmentResponseDTO> listAll() {
-        return shipmentRepo.findAll().stream().map(this::toResponseDTO).toList();
+        UUID storeId = TenantContext.getStoreId();
+        return shipmentRepo.findAllByStoreId(storeId).stream().map(this::toResponseDTO).toList();
     }
 
     @Transactional(readOnly = true)
@@ -132,19 +135,21 @@ public class ShippingService {
 
     @Transactional(readOnly = true)
     public Optional<ShipmentResponseDTO> findById(UUID shipmentId) {
-        return shipmentRepo.findById(shipmentId).map(this::toResponseDTO);
+        UUID storeId = TenantContext.getStoreId();
+        return shipmentRepo.findByShipmentIdAndStoreId(shipmentId, storeId).map(this::toResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public List<ShipmentResponseDTO> findByCarrier(String carrier) {
-        return shipmentRepo.findAll().stream()
+        UUID storeId = TenantContext.getStoreId();
+        return shipmentRepo.findAllByStoreId(storeId).stream()
                 .filter(s -> s.getCarrier().equalsIgnoreCase(carrier))
                 .map(this::toResponseDTO)
                 .toList();
     }
 
-    private void cascadeOrderStatus(UUID orderId, String shipmentStatus) {
-        Order order = orderRepo.findById(orderId).orElse(null);
+    private void cascadeOrderStatus(UUID orderId, String shipmentStatus, UUID storeId) {
+        Order order = orderRepo.findByOrderIdAndStoreId(orderId, storeId).orElse(null);
         if (order == null) return;
 
         switch (shipmentStatus) {

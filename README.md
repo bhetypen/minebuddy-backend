@@ -13,47 +13,14 @@ Data isolation is enforced at the database level and the application layer. Ever
 
 ## 📦 Orders: The Core Engine (Full CRUD)
 
-The Order module is the heart of MineBuddy, designed to handle the fast-paced nature of social media selling where stock can be a mix of on-hand items and pre-orders.
+The Order module is the heart of MineBuddy, designed for the high-velocity world of Facebook Live selling. It features a sophisticated state machine and automated stock management.
 
-### 1. Workflow State Machine
-Orders follow a strict linear progression (with ranks) to ensure financial and logistical integrity.
+**See [ORDERS.md](readme/ORDERS.md) for a deep dive into the business logic and flowcharts.**
 
-| Status | Rank | Requirement |
-| :--- | :---: | :--- |
-| **RESERVED** | 1 | Initial state upon checkout. |
-| **DP_PAID** | 2 | Down Payment (30%) received (for Pre-orders). |
-| **FOR_ORDERING** | 3 | Ready to be included in supplier batch. |
-| **ORDERED** | 4 | Order placed with the supplier. |
-| **ARRIVED** | 5 | Item received at the seller's warehouse. |
-| **FULLY_PAID** | 6 | Balance reaches zero. |
-| **PACKED** | 7 | Item is boxed and ready for carrier pickup. |
-| **SHIPPED** | 8 | Tracking number assigned and carrier has item. |
-| **COMPLETED** | 9 | Final state: Shipment marked as DELIVERED. |
-| **CANCELLED** | 99 | Terminal state for aborted transactions. |
-
-### 2. Intelligent Fulfillment Logic
-The `OrderService` automatically determines the fulfillment path based on item availability:
-- **On-Hand Only:** Deducts stock immediately; fails if insufficient.
-- **Pre-Order Only:** Accepts the order regardless of current stock; sets status to RESERVED.
-- **Hybrid System:** The "Smart Split" — if a user wants 5 items but only 2 are in stock, the system automatically creates two linked orders: one for the 2 on-hand items and one for the 3 pre-order items.
-
-### 3. Order Lifecycle Diagram
-
-```mermaid
-stateDiagram-v2
-    [*] --> RESERVED: Create Order
-    RESERVED --> DP_PAID: Pay 30% Deposit
-    DP_PAID --> FOR_ORDERING
-    FOR_ORDERING --> ORDERED: Supplier Batch
-    ORDERED --> ARRIVED: Warehouse Receipt
-    ARRIVED --> FULLY_PAID: Pay Balance
-    FULLY_PAID --> PACKED: Quality Check & Box
-    PACKED --> SHIPPED: Add Tracking #
-    SHIPPED --> COMPLETED: Carrier Delivery
-    
-    RESERVED --> CANCELLED: No Deposit
-    FULLY_PAID --> CANCELLED: Seller Refund
-```
+### 🚀 High-Impact Features
+- **Smart Split Hybrid Logic:** Automatically handles orders that are partially in-stock and partially pre-order, splitting them into separate tracks while pro-rating shipping fees.
+- **Workflow Guardrails:** A rank-based state machine prevents out-of-order operations (e.g., shipping without tracking or balance).
+- **Stock Integrity:** Automatic stock restoration on order cancellation or edits.
 
 ---
 

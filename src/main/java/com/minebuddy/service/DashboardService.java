@@ -57,6 +57,7 @@ public class DashboardService {
 
         return new DashboardStatsDTO(
                 computeGrossRevenueThisMonth(allOrders),
+                computeNetProfitThisMonth(allOrders),
                 computeUncollectedBalance(allOrders),
                 computeOrdersToShip(allOrders, allShipments),
                 computeOrdersInTransit(allShipments),
@@ -75,6 +76,22 @@ public class DashboardService {
                 .filter(o -> o.getStatus() == OrderStatus.COMPLETED)
                 .filter(o -> o.getCreatedAt() != null && !o.getCreatedAt().isBefore(monthStart))
                 .map(Order::getTotalAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    // Profit = (unitPrice - unitCost) * quantity for COMPLETED orders this month.
+    private BigDecimal computeNetProfitThisMonth(List<Order> orders) {
+        LocalDateTime monthStart = LocalDate.now()
+                .withDayOfMonth(1)
+                .atStartOfDay();
+
+        return orders.stream()
+                .filter(o -> o.getStatus() == OrderStatus.COMPLETED)
+                .filter(o -> o.getCreatedAt() != null && !o.getCreatedAt().isBefore(monthStart))
+                .map(o -> {
+                    BigDecimal unitProfit = o.getUnitPriceAtOrderTime().subtract(o.getUnitCostAtOrderTime());
+                    return unitProfit.multiply(BigDecimal.valueOf(o.getQuantity()));
+                })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
