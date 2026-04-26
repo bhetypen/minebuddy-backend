@@ -5,6 +5,7 @@ import com.minebuddy.dto.response.OrderResponseDTO;
 import com.minebuddy.dto.OrderSummaryDTO;
 import com.minebuddy.model.enums.OrderStatus;
 import com.minebuddy.service.OrderService;
+import com.minebuddy.service.OrderService.OrderResult;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -56,44 +57,27 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody OrderRequestDTO dto) {
-        OrderResponseDTO order = service.createOrder(dto);
-        if (order == null) {
-            return ResponseEntity.badRequest().body(Map.of("message", service.getMessage()));
-        }
+        OrderResult result = service.createOrder(dto);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(Map.of("order", order, "message", service.getMessage()));
+                .body(Map.of("order", result.order(), "message", result.message()));
     }
 
     @PatchMapping("/{id}")
     public ResponseEntity<?> edit(@PathVariable UUID id, @RequestBody EditOrderPayload payload) {
-        boolean ok = service.editOrder(
-                id,
-                payload.itemId(),
-                payload.quantity(),
-                payload.shippingFee()
-        );
-        if (!ok) {
-            return ResponseEntity.badRequest().body(Map.of("message", service.getMessage()));
-        }
-        return ResponseEntity.ok(Map.of("message", service.getMessage()));
+        String message = service.editOrder(id, payload.itemId(), payload.quantity(), payload.shippingFee());
+        return ResponseEntity.ok(Map.of("message", message));
     }
 
     @PatchMapping("/{id}/status")
     public ResponseEntity<?> updateStatus(@PathVariable UUID id, @RequestBody StatusPayload payload) {
-        boolean ok = service.updateStatus(id, payload.status());
-        if (!ok) {
-            return ResponseEntity.badRequest().body(Map.of("message", service.getMessage()));
-        }
-        return ResponseEntity.ok(Map.of("message", service.getMessage()));
+        String message = service.updateStatus(id, payload.status());
+        return ResponseEntity.ok(Map.of("message", message));
     }
 
     @PostMapping("/{id}/cancel")
     public ResponseEntity<?> cancel(@PathVariable UUID id) {
-        boolean ok = service.cancelOrder(id);
-        if (!ok) {
-            return ResponseEntity.badRequest().body(Map.of("message", service.getMessage()));
-        }
-        return ResponseEntity.ok(Map.of("message", service.getMessage()));
+        String message = service.cancelOrder(id);
+        return ResponseEntity.ok(Map.of("message", message));
     }
 
     @PostMapping("/batch-arrival/{itemId}")
